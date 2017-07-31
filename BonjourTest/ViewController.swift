@@ -59,35 +59,39 @@ extension ViewController: UITableViewDelegate {
 
 extension ViewController: NetServiceDelegate {
     
+    enum IPError: Error {
+        case unableToGetIpAddress
+    }
+
     func netServiceDidResolveAddress(_ sender: NetService) {
         serviceResolver?.stop()
-        let ipAddress = getIpV4(from: sender.addresses, port: sender.port)
-        guard let indexPathForSelectedRow = tableView.indexPathForSelectedRow else { return }
-        let cell = tableView.cellForRow(at: indexPathForSelectedRow)
-        cell?.detailTextLabel?.text = "IPv4: \(ipAddress)\nhostname: \(sender.hostName ?? "No hostname")"
-        guard let indexPath = tableView.indexPathForSelectedRow else { return }
-        tableView.deselectRow(at: indexPath, animated: true)
+        var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        
+        guard let data = sender.addresses?.first,
+            let indexPathForSelectedRow = tableView.indexPathForSelectedRow
+            else { return }
+        
+        do {
+            try data.withUnsafeBytes { (pointer: UnsafePointer<sockaddr>) in
+                guard getnameinfo(pointer, socklen_t(data.count), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST) == 0 else {
+                    throw IPError.unableToGetIpAddress
+                }
+            }
+            
+            let ipAddress = String(cString: hostname)
+            let cell = tableView.cellForRow(at: indexPathForSelectedRow)
+            cell?.detailTextLabel?.text = "\(sender.hostName ?? "No hostname")\n\(ipAddress):\(sender.port)"
+            tableView.deselectRow(at: indexPathForSelectedRow, animated: true)
+        } catch {
+            print(error)
+        }
     }
     
     func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
         print("errorDict = \(errorDict)")
         serviceResolver?.stop()
-    }
-    
-    func getIpV4(from addresses: [Data]?, port: Int) -> String {
-        guard let data = addresses?.first as NSData? else { return "N/A" }
-        
-        var ip1 = UInt8(0)
-        var ip2 = UInt8(0)
-        var ip3 = UInt8(0)
-        var ip4 = UInt8(0)
-        
-        data.getBytes(&ip1, range: NSMakeRange(4, 1))
-        data.getBytes(&ip2, range: NSMakeRange(5, 1))
-        data.getBytes(&ip3, range: NSMakeRange(6, 1))
-        data.getBytes(&ip4, range: NSMakeRange(7, 1))
-        
-        return "\(ip1).\(ip2).\(ip3).\(ip4):\(port)"
+        guard let indexPathForSelectedRow = tableView.indexPathForSelectedRow else { return }
+        tableView.deselectRow(at: indexPathForSelectedRow, animated: true)
     }
 }
 
