@@ -37,7 +37,7 @@ extension ViewController: UITableViewDataSource {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
         let service = services[indexPath.row]
         cell.textLabel?.text = service.name
-        cell.detailTextLabel?.text = "Tap to resolve IP address"
+        cell.detailTextLabel?.text = "Tap to resolve"
         return cell
     }
 }
@@ -64,7 +64,9 @@ extension ViewController: NetServiceDelegate {
         let ipAddress = getIpV4(from: sender.addresses, port: sender.port)
         guard let indexPathForSelectedRow = tableView.indexPathForSelectedRow else { return }
         let cell = tableView.cellForRow(at: indexPathForSelectedRow)
-        cell?.detailTextLabel?.text = ipAddress
+        cell?.detailTextLabel?.text = "IPv4: \(ipAddress)\nhostname: \(sender.hostName ?? "No hostname")"
+        guard let indexPath = tableView.indexPathForSelectedRow else { return }
+        tableView.deselectRow(at: indexPath, animated: true)
     }
     
     func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
